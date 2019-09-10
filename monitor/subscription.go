@@ -245,7 +245,7 @@ func (s *Subscription) AddNodes(nodes ...string) error {
 }
 
 // AddNodeIDs adds nodes with defined monitoring parameters
-func (s *Subscription) AddNodeIDs(nodes ...*ua.NodeID, mcr *MonitoredItemCustomizer) error {
+func (s *Subscription) AddNodeIDsWithCustom(mcr opcua.MonitoredItemCustomizer, nodes ...*ua.NodeID) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -266,8 +266,7 @@ func (s *Subscription) AddNodeIDs(nodes ...*ua.NodeID, mcr *MonitoredItemCustomi
 		}
 
 		// log.Printf("node=%s handle=%d", node.String(), handle)
-
-		toAdd = append(toAdd, mcr.Create(node, ua.AttributeIDValue, handle))
+		toAdd = append(toAdd, mcr.Customize(opcua.NewMonitoredItemCreateRequestWithDefaults(node, ua.AttributeIDValue, handle)))
 	}
 
 	resp, err := s.sub.Monitor(ua.TimestampsToReturnBoth, toAdd...)
