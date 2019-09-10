@@ -244,6 +244,57 @@ func (s *Subscription) AddNodes(nodes ...string) error {
 	return s.AddNodeIDs(nodeIDs...)
 }
 
+// AddNodeIDs adds nodes with defined monitoring parameters
+func (s *Subscription) AddNodeIDs(nodes ...*ua.NodeID, mcr *MonitoredItemCustomizer) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if len(nodes) == 0 {
+		// some server implementionations allow an empty monitoreditemrequest, some don't.
+		// beter to just return
+		return nil
+	}
+
+	toAdd := make([]*ua.MonitoredItemCreateRequest, 0)
+
+	for _, node := range nodes {
+		handle := atomic.AddUint32(&s.monitor.nextClientHandle, 1)
+
+		s.handles[handle] = node
+		s.nodeLookup[node.String()] = &itemIDs{
+			handle: handle,
+		}
+
+		// log.Printf("node=%s handle=%d", node.String(), handle)
+
+		toAdd = append(toAdd, mcr.Create(node, ua.AttributeIDValue, handle))
+	}
+
+	resp, err := s.sub.Monitor(ua.TimestampsToReturnBoth, toAdd...)
+	if err != nil {
+		return err
+	}
+
+	if resp.ResponseHeader.ServiceResult != ua.StatusOK {
+		return resp.ResponseHeader.ServiceResult
+	}
+
+	if len(resp.Results) != len(toAdd) {
+		return fmt.Errorf("opcua: monitor items response length mismatch")
+	}
+
+	for i, res := range resp.Results {
+		if res.StatusCode != ua.StatusOK {
+			return res.StatusCode
+		}
+		// note: this works _iff_ the order of the response is the same as the request
+		sid := toAdd[i].ItemToMonitor.NodeID.String()
+		s.nodeLookup[sid].id = res.MonitoredItemID
+	}
+
+	return nil
+}
+
 // AddNodeIDs adds nodes
 func (s *Subscription) AddNodeIDs(nodes ...*ua.NodeID) error {
 	s.mu.Lock()

@@ -36,6 +36,33 @@ type SubscriptionParameters struct {
 	Notifs                     chan *PublishNotificationData
 }
 
+type MonitoredItemCustomizer interface {
+	Create(nodeID *ua.NodeID, attributeID ua.AttributeID, clientHandle uint32) *ua.MonitoredItemCreateRequest
+}
+
+type MonitoredItemDefault struct{}
+
+func (mi * MonitoredItemDefault) Create(nodeID *ua.NodeID, attributeID ua.AttributeID, clientHandle uint32) *ua.MonitoredItemCreateRequest {
+	if attributeID == 0 {
+		attributeID = ua.AttributeIDValue
+	}
+	return &ua.MonitoredItemCreateRequest{
+		ItemToMonitor: &ua.ReadValueID{
+			NodeID:       nodeID,
+			AttributeID:  attributeID,
+			DataEncoding: &ua.QualifiedName{},
+		},
+		MonitoringMode: ua.MonitoringModeReporting,
+		RequestedParameters: &ua.MonitoringParameters{
+			ClientHandle:     clientHandle,
+			DiscardOldest:    true,
+			Filter:           nil,
+			QueueSize:        10,
+			SamplingInterval: 0.0,
+		},
+	}
+}
+
 func NewMonitoredItemCreateRequestWithDefaults(nodeID *ua.NodeID, attributeID ua.AttributeID, clientHandle uint32) *ua.MonitoredItemCreateRequest {
 	if attributeID == 0 {
 		attributeID = ua.AttributeIDValue
